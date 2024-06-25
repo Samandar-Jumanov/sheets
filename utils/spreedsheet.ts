@@ -4,11 +4,12 @@ import Logger from '../lib/winston';
 import { sendNotification } from './bot';
 import { runPuppeteer } from './puppeteer';
 
-export async function updateFile(values: string[][]) {
+export async function updateFile(values: string[][], startRow: number) {
   try {
+    const range = `Sheet1!C${startRow}`;
     const res = await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: 'Sheet1!C2',
+      range: range,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: values,
@@ -24,10 +25,10 @@ export async function readSheet() {
   try {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A1:F10', 
+      range: 'Sheet1!A1:F', // Extend the range to include all rows and columns
     });
 
-    const rows = response.data;
+    const rows = response.data.values || [];
     return rows;
   } catch (error: any) {
     Logger.error(error.message);
@@ -37,41 +38,58 @@ export async function readSheet() {
 export const compareAndUpdateSheet = async () => {
   try {
     const sheetData = await readSheet();
-    if (!sheetData || !sheetData.values) {
-      Logger.error("No sheet data found or empty rows");
+    if (!sheetData || sheetData.length <= 1) {
+      Logger.error("No sheet data found or only header row present");
       return;
     }
 
-    const rows = sheetData.values;
-    const lastRow = rows[rows.length - 1];
+    for (let i = 1; i < sheetData.length; i++) {
+      const currentRow = sheetData[i];
+      const url = currentRow[1];
 
-    const url = lastRow[1]; 
+      if (!url) {
+        Logger.error(`URL not found in the sheet at row ${i + 1}`);
+        continue;
+      }
 
-    if (!url) {
-      Logger.error("URL not found in the sheet");
-      return;
-    }
+      const newData = await runPuppeteer(url);
 
-    const newData = await runPuppeteer(url);
+      if (!newData) {
+        Logger.error("No data fetched from Puppeteer");
+        continue;
+      }
 
-    if (!newData) {
-      Logger.error("No data fetched from Puppeteer");
-      return;
-    }
 
-    const hasChanged =
-      lastRow[2] !== newData.user_count ||
-      lastRow[3] !== newData.rating ||
-      lastRow[4] !== newData.average_rating ||
-      lastRow[5] !== newData.last_comment;
+      const hasChanged =
+        currentRow[2] !== newData.user_count ||
+        currentRow[3] !== newData.rating ||
+        currentRow[4] !== newData.average_rating ||
+        currentRow[5] !== newData.last_comment;
 
-    if (hasChanged) {
-      const newRow  :any = [newData.user_count, newData.rating, newData.average_rating, newData.last_comment, formattedDate];
-      await updateFile([newRow]);
+      if (hasChanged) {
+        const newRow: any = [newData.user_count, newData.rating, newData.average_rating, newData.last_comment, formattedDate];
 
-      sendNotification('Data has changed', newRow);
+        await updateFile([newRow], i + 1);
+
+        sendNotification('Data has changed', newRow);
+      }
     }
   } catch (error) {
     Logger.error("Error in compareAndUpdateSheet:", error);
   }
 };
+
+export async function getRowCount() {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1:F', // Extend the range to include all rows and columns
+    });
+
+    const rows = response.data.values || [];
+    return rows.length;
+  } catch (error: any) {
+    Logger.error(error.message);
+    return 0; // Return 0 in case of an error
+  }
+}
