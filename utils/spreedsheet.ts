@@ -4,6 +4,7 @@ import Logger from '../lib/winston';
 import { sendNotification } from './bot';
 import { runPuppeteer } from './puppeteer';
 import { IBotMessageInfo } from '../types';
+import { writeToMessage } from './file';
 
 export async function updateFile(values: string[][], startRow: number) {
   try {
@@ -92,11 +93,8 @@ export const compareAndUpdateSheet = async () => {
         await updateFile([newRow], i + 1);
       }
     }
-
-    if (botMessages.length > 0) {
-      await sendNotification('Data has changed', botMessages);
-    }
-
+        writeToMessage(botMessages)
+        return 
   } catch (error) {
     Logger.error("Error in compareAndUpdateSheet:", error);
   }

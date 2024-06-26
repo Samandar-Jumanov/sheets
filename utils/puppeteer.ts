@@ -1,8 +1,9 @@
 import puppeteer, { Browser } from "puppeteer";
+import Logger from "../lib/winston";
 
 
 export const runPuppeteer = async (url: string) => {
-  const browser: Browser = await puppeteer.launch({ headless: true });
+  const browser: Browser = await puppeteer.launch({ headless: false  });
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'networkidle2' });
 
@@ -30,7 +31,8 @@ export const runPuppeteer = async (url: string) => {
     return element ? element.textContent : null;
   });
 
-  await browser.close();
+  
+  Logger.info("Finished puppetter")
 
   return {
     user_count: userCount,
