@@ -7,6 +7,10 @@ import TelegramBot from "node-telegram-bot-api";
 import { deleteMessages, readMessages } from "./utils/file";
 import { IBotMessageInfo } from "./types";
 
+
+
+
+// google json example can be taken from google sheets 
 const app: Express = express();
 
 // Health checker
@@ -14,7 +18,6 @@ app.get("/", (req: Request, res: Response) => {
   res.json({ message: "Success" });
 });
 
-// Telegram bot /start command handler
 bot.onText(/\/start/, async (msg: TelegramBot.Message) => {
   const chatId = msg.chat.id.toString();
   const messages: IBotMessageInfo[] | null = readMessages();
@@ -22,10 +25,8 @@ bot.onText(/\/start/, async (msg: TelegramBot.Message) => {
   deleteMessages();
 });
 
-// Initial execution of the compareAndUpdateSheet function
 compareAndUpdateSheet().then().catch(( error : any ) => Logger.error(error));
 
-// Schedule the compareAndUpdateSheet function to run every 15 minutes
 cron.schedule("*/15 * * * *", () => {
   compareAndUpdateSheet()
     .then()
