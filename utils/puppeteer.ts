@@ -1,9 +1,8 @@
 import puppeteer, { Browser } from "puppeteer";
 
 
-
 export const runPuppeteer = async (url: string) => {
-  const browser: Browser = await puppeteer.launch({ headless: false });
+  const browser: Browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'networkidle2' });
 

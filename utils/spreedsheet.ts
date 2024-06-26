@@ -3,6 +3,7 @@ import { sheets, sheetId } from '../lib/google-spreedsheet';
 import Logger from '../lib/winston';
 import { sendNotification } from './bot';
 import { runPuppeteer } from './puppeteer';
+import { IBotMessageInfo } from '../types';
 
 export async function updateFile(values: string[][], startRow: number) {
   try {
@@ -37,11 +38,15 @@ export async function readSheet() {
 
 export const compareAndUpdateSheet = async () => {
   try {
+    Logger.info("Started to compare and update sheet")
     const sheetData = await readSheet();
+
     if (!sheetData || sheetData.length <= 1) {
       Logger.error("No sheet data found or only header row present");
       return;
     }
+
+    const botMessages: IBotMessageInfo[] = [];
 
     for (let i = 1; i < sheetData.length; i++) {
       const currentRow = sheetData[i];
@@ -59,7 +64,6 @@ export const compareAndUpdateSheet = async () => {
         continue;
       }
 
-
       const hasChanged =
         currentRow[2] !== newData.user_count ||
         currentRow[3] !== newData.rating ||
@@ -67,29 +71,33 @@ export const compareAndUpdateSheet = async () => {
         currentRow[5] !== newData.last_comment;
 
       if (hasChanged) {
-        const newRow: any = [newData.user_count, newData.rating, newData.average_rating, newData.last_comment, formattedDate];
+        const newRow : any  = [
+          newData.user_count,
+          newData.rating,
+          newData.average_rating,
+          newData.last_comment,
+          formattedDate,
+        ];
+
+        const data: IBotMessageInfo = {
+          updated_user_count: newData.user_count as string,
+          updated_rating: newData.rating as any ,
+          avg_rating: newData.average_rating as string | number,
+          last_comment: newData.last_comment as string,
+          updated_date: formattedDate,
+        };
+
+        botMessages.push(data);
 
         await updateFile([newRow], i + 1);
-
-        sendNotification('Data has changed', newRow);
       }
     }
+
+    if (botMessages.length > 0) {
+      await sendNotification('Data has changed', botMessages);
+    }
+
   } catch (error) {
     Logger.error("Error in compareAndUpdateSheet:", error);
   }
 };
-
-export async function getRowCount() {
-  try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: 'Sheet1!A1:F', // Extend the range to include all rows and columns
-    });
-
-    const rows = response.data.values || [];
-    return rows.length;
-  } catch (error: any) {
-    Logger.error(error.message);
-    return 0; // Return 0 in case of an error
-  }
-}
